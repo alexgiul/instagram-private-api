@@ -238,3 +238,45 @@ Session.prototype.preLoginFlow = function() {
                     throw new Error(error.message);
                 })
 }
+
+
+
+Session.login_light = function(session, username, password) {
+    return  new Request(session)
+            .setResource('login')
+            .setMethod('POST')
+            .setData({
+                username: username,
+                password: password,
+                guid: session.uuid,
+                phone_id: session.phone_id,
+                adid: session.adid,
+                login_attempt_count: 0
+            })
+            .signPayload()
+            .send()
+            .then(function(result){
+                return result.logged_in_user;
+            })
+        .catch(Exceptions.CheckpointError, function(error) {
+            throw error;            
+        })
+        .catch(function (error) {
+            if (error.name == "RequestError" && _.isObject(error.json)) {
+                if(error.json.invalid_credentials)
+                    throw new Exceptions.AuthenticationError(error.message);
+                if(error.json.error_type==="inactive user")
+                    throw new Exceptions.AccountBanned(error.json.message+' '+error.json.help_url);
+            }
+            throw error;
+        })
+}
+
+Session.create_light = function(device, storage, username, password, proxy) {
+    var that = this;
+    var session = new Session(device, storage);
+    if(_.isString(proxy) && !_.isEmpty(proxy))
+        session.proxyUrl = proxy;
+    
+    return Session.login_light(session, username, password)
+}
