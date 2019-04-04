@@ -1,7 +1,7 @@
 var _ = require("lodash");
 var Promise = require("bluebird");
 var request = require('request-promise');
-var JSONbig = require('json-bigint');
+
 var ProxyAgent = require('proxy-agent');
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
@@ -301,12 +301,18 @@ Request.prototype.parseMiddleware = function (response) {
         response.body = {status:"ok",start:loaded[1],end:loaded[2],total:loaded[3]};
         return response;
     }
+
+
     try {
-        response.body = JSONbig.parse(response.body);
-        return response;
+      // Sometimes we have numbers greater than Number.MAX_SAFE_INTEGER in json response
+      // To handle it we just wrap numbers with length > 15 it double quotes to get strings instead
+      const bigIntToString = /([\[:])?(-?[\d.]{15,})(\s*?[,}\]])/gi;
+      response.body = JSON.parse(response.body.replace(bigIntToString, `$1"$2"$3`));
+      return response;
     } catch (err) {
-        throw new Exceptions.ParseError(response, this);
+      throw new Exceptions.ParseError(response, this);
     }
+
 };
 
 
